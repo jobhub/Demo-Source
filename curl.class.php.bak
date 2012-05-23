@@ -1,0 +1,296 @@
+<?php
+@include_once("../config.php");
+
+class curl2 {
+
+    /*
+     * URL который запросить
+     *
+     */
+    public $url;
+    /**
+     * @var string
+     *
+     * IP адрес через который посылается запрос
+     *
+     */
+    public $int = false;
+
+
+    public $referrer = '';
+
+    public $cookie_file = '';
+
+    public $proxy = '';
+
+    public $timeout = 15;
+
+    public $header = 0;
+
+    public $ua = 0;
+
+    public $lastHeaders = '';
+    /**/
+    private  $lastStatus;
+    private  $lastError;
+
+    public  function __construct($url = '', $referrer='', $cookie_file='', $proxy='', $timeout=15, $header=0, $int = 0){
+        $this->url         = $url;
+        $this->referrer    = $referrer;
+        $this->cookie_file = $cookie_file;
+        $this->proxy       = $proxy ;
+        $this->timeout     = 15;
+        $this->header      = $header;
+        $this->int         = $int;
+    }
+
+
+
+    /**
+     *
+     * Выбрать случайный интерфейс.
+     *
+     *
+     * @param bool $int
+     * @return void
+     */
+    public  function  setInterface($int = false){
+        global $CFG;
+
+        if ($int == false)
+            $this->int = trim($CFG->ips[rand(0,count($CFG->ips)-1)]);
+
+        else
+            $this->int = $int;
+
+    }
+
+    /**
+     *
+     * Настроить курл для выполнения GET запроса
+     * @throws Exception
+     * @param $url
+     * @return mixed
+     */
+    public function curlGET2($url = '') {
+        if (!$url && !$this->url)
+            throw new Exception('Не указан URL!');
+         if ($url)
+            $this->url = $url;
+
+        $ch = curl_init($this->url);
+
+        return $this->curlExec($ch);
+    }
+
+    /**
+     *
+     * Настроить курл для выполнения POST запроса
+     *
+     * @throws Exception
+     * @param string $url
+     * @param array $POSTdata
+     * @return mixed
+     */
+    public  function  curlPost($url = '', $POSTdata = array()){
+        $url = trim($url);
+
+        if (empty($POSTdata))
+             throw new Exception('Нет данных!');
+        if (!$url && !$this->url)
+             throw new Exception('Не указан URL!');
+
+        if ($url)
+            $this->url = $url;
+        $ch = curl_init($this->url);
+
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $POSTdata);
+
+
+        return $this->curlExec($ch);
+
+
+    }
+
+
+    /**
+     * @param $ch
+     *
+     * Выставить общие настройки и выполнить курловый запрос
+     *
+     * @return mixed
+     */
+    private function curlExec($ch){
+         global $CFG;
+
+        if (!$this->int)
+            $this->setInterface(false);
+
+        if (!$this->ua)
+            $this->ua  = $this->setNewUserAgent();
+
+
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+        curl_setopt($ch,  CURLOPT_INTERFACE, $this->int);
+        curl_setopt ($ch, CURLOPT_USERAGENT, $this->ua);
+        curl_setopt($ch, CURLINFO_HEADER_OUT, true);
+
+        if($this->referrer) curl_setopt($ch, CURLOPT_REFERER, $this->referrer);
+        if($this->header)   curl_setopt($ch, CURLOPT_HEADER, 1);
+        if($this->proxy)    curl_setopt($ch, CURLOPT_PROXY, $this->proxy);
+
+        /***************************************************************/
+        $this->cookie_file =  $CFG->datadir."/".$this->int."_cookie.txt";
+        /***************************************************************/
+        curl_setopt($ch, CURLOPT_COOKIEJAR,  $this->cookie_file);
+        curl_setopt($ch, CURLOPT_COOKIEFILE, $this->cookie_file);
+        $content = curl_exec($ch);
+
+        $this->lastStatus  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $this->lastError   = curl_error($ch);
+        $this->lastHeaders = curl_getinfo($ch, CURLINFO_HEADER_OUT);
+        curl_close($ch);
+
+        return $content;
+    }
+
+
+    /**
+     * @param $url
+     * @return mixed
+     */
+    public  function getUrl($url){
+        $this->url = $url;
+        return $this->curlGET2();
+
+    }
+
+
+    /**
+     * @param $url
+     * @return void
+     */
+    public function setUrl($url){
+        $this->url = $url;
+    }
+
+
+    /**
+     * @return int
+     */
+    public  function  getLastStatus(){
+        return $this->lastStatus;
+    }
+
+    public  function  getLastError(){
+        return $this->lastError;
+    }
+
+    public  function setNewUserAgent(){
+        global $CFG;
+        $this->ua  = rtrim($CFG->ua[rand(0, count($CFG->ua)-1)]);
+    }
+
+    public   function recognize($filename, $apikey = 'ca45bd941ba8006e676c27c1bc4d8eba', $is_verbose = true, $rtimeout = 10, $mtimeout = 120, $is_phrase = 0, $is_regsense = 0, $is_numeric = 0, $min_len = 0, $max_len = 0)
+    {
+	    if (!file_exists($filename))
+	    {
+		    if ($is_verbose) echo "file $filename not found\n";
+            flush();
+		    return false;
+	    }
+        $postdata = array(
+            'method'    => 'post',
+            'key'       => $apikey,
+            'file'      => '@'.$filename, //полный путь к файлу
+            'phrase'	=> $is_phrase,
+            'regsense'	=> $is_regsense,
+            'numeric'	=> $is_numeric,
+            'min_len'	=> $min_len,
+            'max_len'	=> $max_len,
+
+        );
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL,            'http://antigate.com/in.php');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT,        60);
+        curl_setopt($ch, CURLOPT_POST,           1);
+        curl_setopt($ch,  CURLOPT_INTERFACE, '92.38.195.130');
+        curl_setopt($ch, CURLOPT_POSTFIELDS,     $postdata);
+        $result = curl_exec($ch);
+        if (curl_errno($ch))
+        {
+            if ($is_verbose) echo "CURL returned error: ".curl_error($ch)."\n";
+            flush();
+            return false;
+        }
+        curl_close($ch);
+        if (strpos($result, "ERROR")!==false)
+        {
+            if ($is_verbose) echo "server returned error: $result\n";
+            flush();
+            return false;
+        }
+        else
+        {
+            $ex = explode("|", $result);
+            $captcha_id = $ex[1];
+            if ($is_verbose) echo "captcha sent, got captcha ID $captcha_id\n";
+
+            $waittime = 0;
+            if ($is_verbose) echo "waiting for $rtimeout seconds\n";
+
+            sleep($rtimeout);
+            while(true)
+            {
+                $result = file_get_contents('http://antigate.com/res.php?key='.$apikey.'&action=get&id='.$captcha_id);
+                if (strpos($result, 'ERROR')!==false)
+                {
+                    if ($is_verbose) echo "server returned error: $result\n";
+                    return false;
+                }
+                if ($result=="CAPCHA_NOT_READY")
+                {
+                    if ($is_verbose) echo "captcha is not ready yet\n";
+                    $waittime += $rtimeout;
+                    if ($waittime>$mtimeout)
+                    {
+                        if ($is_verbose) echo "timelimit ($mtimeout) hit\n";
+                        flush();
+                        break;
+                    }
+                    if ($is_verbose) echo "waiting for $rtimeout seconds\n";
+                    flush();
+                    sleep($rtimeout);
+                }
+                else
+                {
+
+                    $ex = explode('|', $result);
+                    if (trim($ex[0])=='OK'){
+                        if ($is_verbose) echo "captcha OK (".trim($ex[1]).") continue execution";
+                        flush();
+                        return trim($ex[1]);
+                    }
+                    else {
+                        if ($is_verbose) echo "captcha ERROR!";
+                        flush();
+                    }
+
+                }
+            }
+
+            return false;
+        }
+    }// function recognize(
+
+     function __destruct(){
+        @unlink($this->cookie_file);
+    }
+
+}
